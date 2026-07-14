@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>룰렛 당첨자 뽑기</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Apple SD Gothic Neo', sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 { font-size: 1.8rem; margin: 10px 0; }
+        .badge { font-size: 0.75rem; opacity: 0.5; margin-bottom: 15px; }
+        .input-area { display: flex; gap: 8px; margin-bottom: 15px; }
+        .input-area input {
+            padding: 8px 12px; border-radius: 8px; border: none;
+            font-size: 1rem; width: 180px;
+        }
+        .input-area button, .spin-btn {
+            padding: 8px 16px; border-radius: 8px; border: none;
+            font-size: 1rem; cursor: pointer; font-weight: bold;
+        }
+        .input-area button { background: #e94560; color: white; }
+        .names { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 15px; justify-content: center; max-width: 400px; }
+        .names span {
+            background: rgba(255,255,255,0.15); padding: 4px 10px;
+            border-radius: 12px; font-size: 0.85rem; cursor: pointer;
+        }
+        .names span:hover { background: rgba(233,69,96,0.5); text-decoration: line-through; }
+        .wheel-container { position: relative; margin: 10px 0; }
+        canvas { border-radius: 50%; box-shadow: 0 0 30px rgba(233,69,96,0.3); }
+        .pointer {
+            position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+            font-size: 2rem; z-index: 10; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+        }
+        .spin-btn {
+            background: linear-gradient(135deg, #e94560, #c23152);
+            color: white; font-size: 1.2rem; padding: 12px 40px; margin-top: 15px;
+        }
+        .spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .result {
+            margin-top: 15px; font-size: 1.5rem; font-weight: bold;
+            min-height: 2rem; color: #ffd700;
+        }
+    </style>
+</head>
+<body>
+    <h1>룰렛 당첨자 뽑기</h1>
+    <div class="badge">Powered by k3s on Oracle Cloud</div>
+    <div class="input-area">
+        <input type="text" id="nameInput" placeholder="이름 입력" />
+        <button onclick="addName()">추가</button>
+    </div>
+    <div class="names" id="nameList"></div>
+    <div class="wheel-container">
+        <div class="pointer">▼</div>
+        <canvas id="wheel" width="300" height="300"></canvas>
+    </div>
+    <button class="spin-btn" id="spinBtn" onclick="spin()">돌리기!</button>
+    <div class="result" id="result"></div>
+
+    <script>
+        let names = [];
+        let spinning = false;
+        let rotation = 0;
+        const colors = ['#e94560','#0f3460','#533483','#e94560','#16213e','#1a1a2e','#c23152','#4a1942'];
+        const canvas = document.getElementById('wheel');
+        const ctx = canvas.getContext('2d');
+
+        document.getElementById('nameInput').addEventListener('keypress', e => {
+            if (e.key === 'Enter') addName();
+        });
+
+        function addName() {
+            const input = document.getElementById('nameInput');
+            const name = input.value.trim();
+            if (name && names.length < 12) {
+                names.push(name);
+                input.value = '';
+                renderNames();
+                drawWheel();
+            }
+        }
+
+        function removeName(i) {
+            if (spinning) return;
+            names.splice(i, 1);
+            renderNames();
+            drawWheel();
+            document.getElementById('result').textContent = '';
+        }
+
+        function renderNames() {
+            const el = document.getElementById('nameList');
+            el.innerHTML = names.map((n, i) =>
+                `<span onclick="removeName(${i})">${n} ✕</span>`
+            ).join('');
+        }
+
+        function drawWheel(offset = 0) {
+            const cx = 150, cy = 150, r = 140;
+            ctx.clearRect(0, 0, 300, 300);
+            if (names.length === 0) {
+                ctx.fillStyle = '#222';
+                ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = '#555'; ctx.font = '16px sans-serif'; ctx.textAlign = 'center';
+                ctx.fillText('이름을 추가하세요', cx, cy);
+                return;
+            }
+            const arc = (Math.PI * 2) / names.length;
+            names.forEach((name, i) => {
+                const angle = arc * i + offset;
+                ctx.beginPath();
+                ctx.moveTo(cx, cy);
+                ctx.arc(cx, cy, r, angle, angle + arc);
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.save();
+                ctx.translate(cx, cy);
+                ctx.rotate(angle + arc / 2);
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(name.length > 6 ? name.slice(0, 6) + '..' : name, r * 0.6, 5);
+                ctx.restore();
+            });
+            ctx.beginPath(); ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffd700'; ctx.fill();
+        }
+
+        function spin() {
+            if (spinning || names.length < 2) return;
+            spinning = true;
+            document.getElementById('spinBtn').disabled = true;
+            document.getElementById('result').textContent = '';
+            const totalRotation = Math.PI * 2 * (5 + Math.random() * 5);
+            const duration = 4000;
+            const start = performance.now();
+
+            function animate(now) {
+                const elapsed = now - start;
+                const progress = Math.min(elapsed / duration, 1);
+                const ease = 1 - Math.pow(1 - progress, 3);
+                rotation = totalRotation * ease;
+                drawWheel(-rotation);
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    spinning = false;
+                    document.getElementById('spinBtn').disabled = false;
+                    const arc = (Math.PI * 2) / names.length;
+                    const normalized = ((rotation % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+                    // 포인터(▼)는 캔버스 좌표상 12시 방향(1.5π). 원판이 -rotation 만큼 돌았으므로
+                    // 포인터 아래에 있는 조각 = (1.5π + 회전량) 위치에 그려진 조각
+                    const pointerAngle = (Math.PI * 1.5 + normalized) % (Math.PI * 2);
+                    const winnerIdx = Math.floor(pointerAngle / arc) % names.length;
+                    document.getElementById('result').textContent = '🎉 ' + names[winnerIdx] + ' 당첨!';
+                }
+            }
+            requestAnimationFrame(animate);
+        }
+
+        drawWheel();
+    </script>
+</body>
+</html>
